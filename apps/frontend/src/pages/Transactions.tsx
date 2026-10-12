@@ -2,6 +2,11 @@
 // 25 at a time** (keyset `before`). Not "all history" but "everything recent the node still remembers".
 // The filters (template and party) live in the address query and the server judges them — here we pass
 // the input on and draw the result.
+//
+// **Live** (`?live=1`) is the same screen on a clock: the list re-reads every few seconds and new updates
+// come in at the top (pages/Live.tsx). It is a switch in the toolbar and a value in the address, so a
+// screen left open on a wall bookmarks `#/transactions?live=1`. While it is on, the filters and the pages
+// step aside — a list that moves has no page to stand on.
 import {
   Button,
   MessageRow,
@@ -28,6 +33,7 @@ import {
   setHashParams,
 } from "../route/hash.ts";
 import { useSession } from "../session/SessionContext.tsx";
+import { isLive, Live } from "./Live.tsx";
 import { pickedTemplate, TEMPLATE_PINNED } from "./template-filter.ts";
 
 const TX_KEYS = ["template", "party", "before"] as const;
@@ -37,7 +43,14 @@ const TX_KEYS = ["template", "party", "before"] as const;
 // Apply, Clear and a filter change empty it.
 const newerStack: string[] = [];
 
+// **The fetching half.** It holds the session, the effect and the answer; it draws nothing.
 export function Transactions({ hash }: { hash: string }) {
+  // Switched on, the screen is the live mode's: it holds its own clock and reads nothing from here.
+  if (isLive(hash)) return <Live hash={hash} />;
+  return <TransactionsPaged hash={hash} />;
+}
+
+function TransactionsPaged({ hash }: { hash: string }) {
   const { api, lastOffset, loading, generation, templates } = useSession();
   // Suggestion material for the filter field — module:entity from my catalog. Typing help, not judgement.
   const templateOptions = (templates?.rows ?? []).map((r) => `${r.module}:${r.entity}`);
@@ -48,19 +61,9 @@ export function Transactions({ hash }: { hash: string }) {
 
   const [u, setU] = useState<UpdatesResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [templateInput, setTemplateInput] = useState(template);
-  const [partyInput, setPartyInput] = useState(party);
-  // The fields mirror the address — only when the address changed and when everything was re-read.
-  // Mirroring on every draw would wipe what is being typed.
-  const applied = useMemo(() => ({ template, party, generation }), [template, party, generation]);
-  useEffect(() => {
-    setTemplateInput(applied.template);
-    setPartyInput(applied.party);
-  }, [applied]);
   // When the filter changes, the rewind stack starts over.
   const filterKey = `${template}\u0000${party}`;
   const lastFilter = useRef(filterKey);
-  const clearedHref = hashWith({ template: null, party: null, before: null }, hash);
 
   // Read once per (generation · offset · query) — so a mid-change render does not go out on old conditions.
   const ran = useRef<string | null>(null);
@@ -95,7 +98,56 @@ export function Transactions({ hash }: { hash: string }) {
     };
   }, [api, loading, generation, lastOffset, template, party, before, filterKey]);
 
+  return (
+    <TransactionsView
+      u={u}
+      error={error}
+      hash={hash}
+      templateOptions={templateOptions}
+      generation={generation}
+    />
+  );
+}
+
+// **The drawing half — a function of one response and the address, and nothing else.** No session, no
+// effect, no clock. That is what lets a test hand it the answer a real participant gave and count the rows
+// that come out: joined to the fetching, a static render only ever reaches "Reading updates…" and the screen
+// itself is never looked at (2026-09-18).
+//
+// The text fields keep their own state here because that is what they are — what is being typed, which is
+// not an answer to anything. They start from the address, which is where the applied filter lives.
+export function TransactionsView({
+  u,
+  error,
+  hash,
+  templateOptions = [],
+  generation = 0,
+}: {
+  u: UpdatesResponse | null;
+  error: string | null;
+  hash: string;
+  templateOptions?: readonly string[];
+  /** See `ContractsView` — a full re-read restores the draft fields from the address. */
+  generation?: number;
+}) {
+  const q = hashQuery(hash);
+  const template = q.get("template") ?? "";
+  const party = q.get("party") ?? "";
+  const before = q.get("before") ?? "";
+  const [templateInput, setTemplateInput] = useState(template);
+  const [partyInput, setPartyInput] = useState(party);
+  // The fields mirror the address — only when the address changed. Mirroring on every draw would wipe
+  // what is being typed.
+  const applied = useMemo(() => ({ template, party, generation }), [template, party, generation]);
+  useEffect(() => {
+    setTemplateInput(applied.template);
+    setPartyInput(applied.party);
+  }, [applied]);
+  const clearedHref = hashWith({ template: null, party: null, before: null }, hash);
+
   const clear = () => {
+    setTemplateInput("");
+    setPartyInput("");
     newerStack.length = 0;
     setHashParams({ template: null, party: null, before: null });
   };
@@ -151,6 +203,21 @@ export function Transactions({ hash }: { hash: string }) {
         {/* Two filters: template and party. The server judges (witnessParties · any one event matching).
             The state lives in the address (?template=&party=&before=). */}
         <ToolbarForm id="tx-filters" onSubmit={submit}>
+          {/* The live switch — first in the toolbar, where the live screen keeps it too (pages/Live.tsx), so
+              it does not move when it is pressed. A page is left behind with the filters: the live list is
+              the unfiltered tail. */}
+          <Button
+            id="tx-live"
+            size="xs"
+            variant="outline"
+            className="live-switch"
+            aria-pressed={false}
+            title="Re-read every few seconds and show new updates as they arrive"
+            onClick={() => setHashParams({ live: "1", before: null, template: null, party: null })}
+          >
+            <span className="live-switch__dot" aria-hidden="true" />
+            Live off
+          </Button>
           <label htmlFor="tx-template">
             Template{" "}
             <SuggestInput

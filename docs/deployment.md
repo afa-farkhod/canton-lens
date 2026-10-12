@@ -101,6 +101,21 @@ should forward `/openapi.json` without acquiring a user token. A missing session
 Serve the Frontend and BFF through one browser origin. In development,
 `BACKEND_PROXY_TARGET` points to the institution front rather than directly to the Backend.
 
+## Link previews
+
+Set `VITE_PUBLIC_URL` in `apps/frontend/.env` (or `docker/.env` for Compose) to the
+public app directory before building, for example `https://explorer.example/` or
+`https://example.com/explorer/`. The frontend emits Open Graph and X card metadata
+directly into its HTML, with absolute image and canonical URLs based on this value.
+Rebuild after changing it. When omitted, the image path is relative for local preview
+and no canonical URL is emitted.
+
+The bundled `og-image.png` contains only the product name, logo, and description.
+It is served as a static file alongside `index.html`. Sharing services must be able
+to fetch both files to display the preview; keep existing access controls on ledger APIs.
+All hash routes share the same product preview. The metadata follows the
+[Open Graph protocol](https://ogp.me/).
+
 ## Preview the build locally
 
 Build the Frontend:
@@ -168,7 +183,7 @@ refuses to start when any of them is defined at all.
 
 | Container | Holds | Port |
 |---|---|---|
-| `frontend` | nginx, the built bundle, `docker/nginx.conf`. No Node, no source | `EXPLORER_BIND`:`EXPLORER_PORT` → 80 |
+| `frontend` | nginx, the built bundle, `docker/nginx.conf.template`. No Node, no source | `EXPLORER_BIND`:`EXPLORER_PORT` → 80 |
 | `backend` | Node 24, workspace source, production dependencies. No frontend assets | unpublished; reachable from `frontend` only |
 
 The Backend image compiles nothing — Node runs the TypeScript in `apps/backend/src` and
@@ -207,16 +222,48 @@ Two further conditions are not settled by this file:
 - Pass no secret as a build argument. A build argument is recorded in the history of the stage that
   declares it, printed in build output, and kept in the build cache.
   `SHARED_IDENTITY_CLIENT_SECRET` is read at startup instead and stays out of both images.
-- Leave `BASE_PATH` unset. `docker/nginx.conf` serves the Explorer at the root; a prefix also needs
-  matching `location` blocks in that file.
+- Leave `BASE_PATH` unset. `docker/nginx.conf.template` serves the Explorer at the root; a prefix
+  also needs matching `location` blocks in that file.
+- nginx sends a Content-Security-Policy, `X-Content-Type-Options`, `X-Frame-Options`,
+  `Referrer-Policy` and `Permissions-Policy` on every answer (`docker/security-headers.conf`). The
+  policy admits the bundle and the one inline script in `apps/frontend/index.html` by hash; after
+  editing that script, rebuild and run `node docker/inline-script-hashes.mjs
+  apps/frontend/dist/index.html`, then update the hash in the template. In `browser-oidc` the
+  policy's `connect-src` is derived from `VITE_OIDC_ISSUER` at container start; a provider that
+  serves its token endpoint from another host needs `CSP_CONNECT_SRC` in `docker/.env`.
 - nginx forwards the `Authorization` header unchanged and makes no authentication decision. In
   `browser-oidc` the user's Canton token travels through it.
 - Review the [security checklist](security.md#deployment-checklist).
+
+## The participant's JSON API list limit
+
+A Canton participant refuses to put more than `http-list-max-elements-limit` elements (default 200) in
+one JSON API response. Over that it answers `413` with the error code
+`JSON_API_MAXIMUM_LIST_ELEMENTS_NUMBER_REACHED`. Explorer reports that as `502` with
+`{"reason":"too_many_elements"}`, and the screen says the list is larger than the node will return in one
+response.
+
+Explorer asks `/v2/state/active-contracts` and `/v2/updates` in pages, so those two are bounded by
+Explorer rather than by the node's limit — up to 10,000 elements or 200 pages per read, past which the
+same `too_many_elements` is returned rather than a shortened list.
+
+Two calls have no pagination parameter in the Canton 3.5 Ledger API and are therefore bounded only by
+that node setting:
+
+| Call | Screen | Condition |
+|---|---|---|
+| `GET /v2/packages` | `/api/catalog/packages` | The participant vets more packages than the limit |
+| `GET /v2/users/{user}/rights` | `/api/session`, and every screen that resolves the viewer | The Canton user holds more rights than the limit (the participant advertises `maxRightsPerUser`, default 1000) |
+
+The remedy for both is the node's `http-list-max-elements-limit`. Raising it raises the participant's
+memory use on those responses.
 
 ## Production
 
 - Serve `apps/frontend/dist/` from the public origin and forward `/api/*` and `/openapi.json` to
   the Backend.
+- Send the same response headers the Docker image sends (`docker/security-headers.conf` and the
+  policy in `docker/nginx.conf.template`), adjusted to the host that serves them.
 - Use HTTPS, edge access controls, and rate limiting. Keep the Backend process port on loopback
   or a protected private network where possible.
 - Keep tokens, secrets, Authorization headers, and ledger response bodies out of logs and traces.

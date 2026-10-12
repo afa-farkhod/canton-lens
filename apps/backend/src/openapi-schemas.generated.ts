@@ -801,6 +801,7 @@ export const responseSchemas = {
       "unreachable",
       "offset_after_ledger_end",
       "pruned",
+      "too_many_elements",
     ],
   },
   LfField: {
@@ -3525,6 +3526,31 @@ export const responseSchemas = {
       nodeId: {
         type: ["number", "null"],
       },
+      lastDescendantNodeId: {
+        type: ["number", "null"],
+      },
+      yours: {
+        type: "array",
+        items: {
+          $ref: "#/components/schemas/VisibilityReason",
+        },
+      },
+      tree: {
+        $ref: "#/components/schemas/UpdateEventPlacement",
+      },
+      divulgedTo: {
+        anyOf: [
+          {
+            type: "array",
+            items: {
+              type: "string",
+            },
+          },
+          {
+            type: "null",
+          },
+        ],
+      },
       contractId: {
         type: "string",
       },
@@ -3607,9 +3633,11 @@ export const responseSchemas = {
       "choiceSchema",
       "consuming",
       "contractId",
+      "divulgedTo",
       "entity",
       "interfaceId",
       "kind",
+      "lastDescendantNodeId",
       "module",
       "nodeId",
       "observers",
@@ -3619,7 +3647,9 @@ export const responseSchemas = {
       "signatories",
       "templateId",
       "templateSchema",
+      "tree",
       "witnessParties",
+      "yours",
     ],
   },
   UpdateDetailHeader: {
@@ -3711,6 +3741,17 @@ export const responseSchemas = {
                 required: ["status"],
                 additionalProperties: false,
               },
+              {
+                type: "object",
+                properties: {
+                  status: {
+                    type: "string",
+                    const: "no_own_parties",
+                  },
+                },
+                required: ["status"],
+                additionalProperties: false,
+              },
             ],
           },
           readAt: {
@@ -3748,6 +3789,22 @@ export const responseSchemas = {
         required: ["kind", "offset", "readAt", "updateId"],
       },
     ],
+  },
+  UpdateEventPlacement: {
+    type: "object",
+    properties: {
+      depth: {
+        type: "number",
+      },
+      ancestorIndex: {
+        type: ["number", "null"],
+      },
+      descendantCount: {
+        type: "number",
+      },
+    },
+    required: ["depth", "ancestorIndex", "descendantCount"],
+    additionalProperties: false,
   },
   UpdateFilter: {
     type: "object",
@@ -3841,6 +3898,36 @@ export const responseSchemas = {
     required: ["party", "roles", "eventIndexes"],
     additionalProperties: false,
   },
+  UpdatesAfterResponse: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      rows: {
+        type: "array",
+        items: {
+          $ref: "#/components/schemas/RecentUpdateRow",
+        },
+        description:
+          "Every update in (beginExclusive, offset] with an event visible to the viewer, newest first. Not filtered, not paged.",
+      },
+      beginExclusive: {
+        type: "number",
+        description:
+          "Where the read started (exclusive): the offset the address named, or offset − 2,000 when the address named something older — the updates between were not read.",
+      },
+      offset: {
+        type: "number",
+      },
+      readAt: {
+        type: "string",
+        description:
+          "The time this response was read (RFC 3339). Stamped on every 200 response not by the router (router.ts) but by the boot file (live/build-app.mjs) that owns the socket — the router does not call the clock.",
+        pattern:
+          "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$",
+      },
+    },
+    required: ["beginExclusive", "offset", "readAt", "rows"],
+  },
   UpdatesResponse: {
     type: "object",
     additionalProperties: false,
@@ -3932,6 +4019,17 @@ export const responseSchemas = {
         properties: {
           status: {
             type: "string",
+            const: "no_own_parties",
+          },
+        },
+        required: ["status"],
+        additionalProperties: false,
+      },
+      {
+        type: "object",
+        properties: {
+          status: {
+            type: "string",
             const: "unavailable",
           },
           reason: {
@@ -3961,6 +4059,6 @@ export const responseSchemas = {
   },
   VisibilityRole: {
     type: "string",
-    enum: ["signatory", "observer", "witness"],
+    enum: ["signatory", "observer", "controller", "witness"],
   },
 };
