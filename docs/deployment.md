@@ -45,6 +45,11 @@ PUBLIC_ENTRY_URL=https://explorer.example/
 The issuer must support OIDC Discovery, PKCE, and browser CORS for the required endpoints. It
 must issue an access token with the audience and claims expected by Canton. Do not configure a
 client secret in the Frontend. Keep every `SHARED_IDENTITY_*` variable unset in this mode.
+The Backend requires HTTPS for a remote `LEDGER_BASE`; HTTP is accepted only on loopback for local
+development, or on a host named in `CALLER_BEARER_INSECURE_HTTP_HOSTS` — the allowance a Backend
+in a container needs, since it cannot reach its host through a loopback name. See
+[Shared Identity against a local stack](#shared-identity-against-a-local-stack), which applies to
+both modes.
 
 ### Shared Identity
 
@@ -201,7 +206,9 @@ reaches the container itself, while the address that does reach the host is not 
 `SHARED_IDENTITY_INSECURE_HTTP_HOSTS` names the hosts whose plaintext HTTP the Backend may use.
 Hosts it does not name still require HTTPS, so a value left in place cannot cover a production
 ledger, and startup prints a warning naming what was allowed. It is refused outright in
-`caller-bearer` mode, which holds no service credential.
+`caller-bearer` mode, which has a list of its own: `CALLER_BEARER_INSECURE_HTTP_HOSTS` does the
+same for the ledger address alone — that mode holds no issuer, so there is nothing to pair it
+with — and is refused in `shared-identity` mode in turn.
 
 Two further conditions are not settled by this file:
 
