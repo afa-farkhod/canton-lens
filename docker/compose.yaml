@@ -72,8 +72,10 @@ services:
       - SHARED_IDENTITY_SCOPES
       - SHARED_IDENTITY_AUDIENCE
       # Development only. A container cannot reach its host through a loopback name, so a local
-      # HTTP participant or IdP has to be named here to be reachable at all. See docker/.env.example.
+      # HTTP participant or IdP has to be named here to be reachable at all — one list per mode. See
+      # docker/.env.example.
       - SHARED_IDENTITY_INSECURE_HTTP_HOSTS
+      - CALLER_BEARER_INSECURE_HTTP_HOSTS
     # No `ports`. The Backend is reachable from the frontend container and from nowhere else.
     # An API-only deployment publishes it deliberately and puts its own entry controls in front.
     restart: unless-stopped

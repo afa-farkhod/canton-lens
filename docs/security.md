@@ -28,7 +28,9 @@ send the same headers.
 
 The Backend refuses to relay a caller Bearer token to a remote participant over plaintext HTTP.
 HTTPS is required for remote ledger addresses; loopback HTTP remains available for local
-development.
+development, and `CALLER_BEARER_INSECURE_HTTP_HOSTS` names further hosts whose plaintext HTTP is
+accepted — the allowance a Backend in a container needs. Every other host still requires HTTPS,
+and startup prints a warning naming the hosts.
 
 ## Shared Identity
 
@@ -63,4 +65,5 @@ submission on that party's behalf. Prefer `CanReadAs` for view-only deployments 
 - Protect the Backend from direct public access.
 - Restrict Shared Identity deployments with operator-managed access control.
 - Grant Canton identities only the required rights.
-- Leave `SHARED_IDENTITY_INSECURE_HTTP_HOSTS` unset. It is a local development allowance.
+- Leave `SHARED_IDENTITY_INSECURE_HTTP_HOSTS` and `CALLER_BEARER_INSECURE_HTTP_HOSTS` unset. They
+  are local development allowances.
