@@ -248,15 +248,15 @@ test("holding a party of one's own as well does not narrow a super reader", asyn
   // filtersByParty and return a fraction of what this viewer may read, under a "whole instance" badge.
   const { bodies } = await askAs([SUPER_READER, OWN_PARTY], "/api/contracts");
   const acs = bodies.find(
-    (b): b is { filter: { filtersByParty: unknown; filtersForAnyParty?: unknown } } =>
-      typeof b === "object" && b !== null && "filter" in b,
+    (b): b is { eventFormat: { filtersByParty: unknown; filtersForAnyParty?: unknown } } =>
+      typeof b === "object" && b !== null && "eventFormat" in b,
   );
   assert.ok(acs, "no active-contracts request was sent");
   assert.ok(
-    acs.filter.filtersForAnyParty !== undefined,
+    acs.eventFormat.filtersForAnyParty !== undefined,
     "the request was narrowed to their own parties",
   );
-  assert.deepEqual(acs.filter.filtersByParty, {});
+  assert.deepEqual(acs.eventFormat.filtersByParty, {});
 });
 
 test("a right whose payload is not the shape the node sends does not grant instance-wide reads", async () => {
@@ -323,12 +323,12 @@ test("/api/home asks as every party too — the home has its own filter choice",
   for (const rights of [[SUPER_READER], [SUPER_READER, OWN_PARTY]]) {
     const { bodies } = await askAs(rights, "/api/home", { asOf: INSTANT });
     const acs = bodies.find(
-      (b): b is { filter: { filtersByParty: unknown; filtersForAnyParty?: unknown } } =>
-        typeof b === "object" && b !== null && "filter" in b,
+      (b): b is { eventFormat: { filtersByParty: unknown; filtersForAnyParty?: unknown } } =>
+        typeof b === "object" && b !== null && "eventFormat" in b,
     );
     assert.ok(acs, "the home sent no active-contracts request");
     assert.ok(
-      acs.filter.filtersForAnyParty !== undefined,
+      acs.eventFormat.filtersForAnyParty !== undefined,
       "the home narrowed a viewer who reads as every party",
     );
   }
@@ -379,16 +379,16 @@ test("the request carries filtersForAnyParty, and names no party beside it", asy
   // filtersByParty is what the node was measured to accept alongside it.
   const { bodies } = await askAs(SUPER_READER, "/api/contracts");
   const acs = bodies.find(
-    (b): b is { filter: { filtersByParty: unknown; filtersForAnyParty: unknown } } =>
-      typeof b === "object" && b !== null && "filter" in b,
+    (b): b is { eventFormat: { filtersByParty: unknown; filtersForAnyParty: unknown } } =>
+      typeof b === "object" && b !== null && "eventFormat" in b,
   );
   assert.ok(acs, "no active-contracts request was sent");
-  assert.deepEqual(acs.filter.filtersForAnyParty, {
+  assert.deepEqual(acs.eventFormat.filtersForAnyParty, {
     cumulative: [
       { identifierFilter: { WildcardFilter: { value: { includeCreatedEventBlob: false } } } },
     ],
   });
-  assert.deepEqual(acs.filter.filtersByParty, {});
+  assert.deepEqual(acs.eventFormat.filtersByParty, {});
 });
 
 test("ParticipantAdmin is not a right to read — it is answered no_party_rights", async () => {

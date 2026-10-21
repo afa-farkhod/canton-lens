@@ -7,13 +7,15 @@
 // invisible from inside that loop.
 //
 // The complete answer to that is the second recording (own-set.ts), which asks the node directly. This file
-// is the part that needs no second recording at all: **what the request itself says.** Three claims, all
+// is the part that needs no second recording at all: **what the request itself says.** Four claims, all
 // checkable against things the check already holds independently of any answer:
 //
 //   · the parties named in the request are exactly the ones this person was *given* (check/given.ts), or
 //     the request names none and uses `filtersForAnyParty`, which only a super reader may do;
 //   · the offset the request reads at is the offset the ledger end reported, when the caller named none;
-//   · a point lookup asks for the thing the address named.
+//   · a point lookup asks for the thing the address named;
+//   · the question is spelled the way the node still takes it — the filter and `verbose` under
+//     `eventFormat`, not at the top of the body, which Canton 3.6 refuses.
 //
 // All of them are about the question. None is derived from what came back, so none can be laundered by a
 // wrong answer.
@@ -28,11 +30,11 @@ const arr = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 export type AskedScope = { parties: string[]; anyParty: boolean };
 
 /**
- * Where a request carries its party filter. The active-contracts body holds it at `filter`; the updates body
- * buries it under the update format. A request with neither is not asking about anybody's data.
+ * Where a request carries its party filter. The active-contracts body holds it under `eventFormat`; the
+ * updates body buries it under the update format. A request with neither is not asking about anybody's data.
  */
 const filterOf = (body: unknown): Record<string, unknown> | null => {
-  const asContracts = rec(rec(body).filter);
+  const asContracts = rec(rec(body).eventFormat);
   if (Object.keys(asContracts).length > 0) return asContracts;
   const asUpdates = rec(rec(rec(rec(rec(body).updateFormat).includeTransactions).eventFormat));
   return Object.keys(asUpdates).length > 0 ? asUpdates : null;
@@ -77,6 +79,19 @@ export function questionProblems(url: string, trace: readonly NodeCall[], given:
 
   for (const call of trace) {
     if (call.method !== "POST") continue;
+
+    // ── in the spelling the node still takes ───────────────────────────────────
+    // Canton 3.3 moved the filter and `verbose` under `eventFormat`; the top of the body is refused from 3.6
+    // and gone in 3.7. The tape cannot catch a request that slid back — it keys both spellings as one
+    // question (ledger-tape.ts) — so the question itself is judged here.
+    if (
+      (call.path.startsWith("/v2/state/active-contracts") || call.path.startsWith("/v2/updates")) &&
+      ("filter" in rec(call.body) || "verbose" in rec(call.body))
+    ) {
+      problems.push(
+        `${call.path} put filter or verbose at the top of the body — the spelling Canton 3.6 refuses`,
+      );
+    }
 
     // ── a point lookup asks for the thing the address named ────────────────────
     // Without this the check reads whatever the lookup returned and builds the expected answer out of it —

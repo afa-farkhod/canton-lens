@@ -9,7 +9,7 @@
 // answers are the same" has been weakened, and a weakening nobody is watching gets wider.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { dedupeTape, type TapeEntry } from "./ledger-tape.ts";
+import { dedupeTape, type TapeEntry, tapeKey } from "./ledger-tape.ts";
 
 const asked = (response: unknown): TapeEntry => ({
   who: "alice",
@@ -35,6 +35,35 @@ test("the same failure, worded for two different requests, is one answer", () =>
   // the file is an answer the node actually gave.
   assert.equal(entries.length, 1);
   assert.match(JSON.stringify(entries[0]), /9da4ed2a/);
+});
+
+test("the 3.4 spelling and today's spelling of the active-contracts question are one key", () => {
+  // The tape was recorded in the old spelling and the product asks in the new one. Keyed apart, every
+  // contracts read would miss the tape; keyed together, nothing in the file is rewritten.
+  const at = "/v2/state/active-contracts?limit=200";
+  const filter = { filtersByParty: { "alice::1220": { cumulative: [] } } };
+  assert.equal(
+    tapeKey("alice", "POST", at, { filter, verbose: true, activeAtOffset: 161 }),
+    tapeKey("alice", "POST", at, {
+      eventFormat: { ...filter, verbose: true },
+      activeAtOffset: 161,
+    }),
+  );
+  // The top-level `verbose: false` an updates request used to carry is the same question without it.
+  const updates = { beginExclusive: 0, endInclusive: 161, updateFormat: {} };
+  assert.equal(
+    tapeKey("alice", "POST", "/v2/updates?limit=200", { ...updates, verbose: false }),
+    tapeKey("alice", "POST", "/v2/updates?limit=200", updates),
+  );
+  // Nothing else is respelled: on any other path the two bodies are two questions, and so are two people.
+  assert.notEqual(
+    tapeKey("alice", "POST", "/v2/other", { filter, verbose: true }),
+    tapeKey("alice", "POST", "/v2/other", { eventFormat: { ...filter, verbose: true } }),
+  );
+  assert.notEqual(
+    tapeKey("alice", "POST", at, { filter, verbose: true, activeAtOffset: 161 }),
+    tapeKey("bob", "POST", at, { eventFormat: { ...filter, verbose: true }, activeAtOffset: 161 }),
+  );
 });
 
 test("a failure that changed category is not excused", () => {

@@ -40,7 +40,7 @@ export const wildcardAcsPages = (trace: readonly NodeCall[]): NodeCall[] =>
 export const acsPagesForInterface = (trace: readonly NodeCall[], interfaceId: string): NodeCall[] =>
   trace.filter((call) => {
     if (call.method !== "POST" || !call.path.startsWith("/v2/state/active-contracts")) return false;
-    const filter = rec(rec(call.body).filter);
+    const filter = rec(rec(call.body).eventFormat);
     const cumulative = [
       ...arr(rec(rec(filter.filtersForAnyParty)).cumulative),
       ...Object.values(rec(filter.filtersByParty)).flatMap((one) => arr(rec(one).cumulative)),

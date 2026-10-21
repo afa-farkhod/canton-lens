@@ -81,9 +81,13 @@ function eventFormatIsWildcard(format: unknown): boolean {
   );
 }
 
-/** POST /v2/state/active-contracts — the filter sits at the top of the body. */
+/**
+ * POST /v2/state/active-contracts — the filter sits under `eventFormat`. **The 2026-09-18 recording has it
+ * at the top of the body** (`filter`, the Canton 3.4 spelling, which the node converted into the same
+ * format), so that place is read too; a recording made today is in the new spelling.
+ */
 export const contractsAskedEverything = (body: unknown): boolean =>
-  eventFormatIsWildcard(rec(body).filter);
+  eventFormatIsWildcard(rec(body).eventFormat ?? rec(body).filter);
 
 /** POST /v2/updates — the filter sits under the transaction format. */
 export const updatesAskedEverything = (body: unknown): boolean =>

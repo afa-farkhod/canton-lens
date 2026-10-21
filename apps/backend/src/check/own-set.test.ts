@@ -15,7 +15,7 @@ const INTERFACE = {
   cumulative: [{ identifierFilter: { InterfaceFilter: { value: { interfaceId: "x" } } } }],
 };
 
-const contractsBody = (filters: unknown) => ({ filter: { filtersByParty: filters } });
+const contractsBody = (filters: unknown) => ({ eventFormat: { filtersByParty: filters } });
 const updatesBody = (filters: unknown) => ({
   updateFormat: { includeTransactions: { eventFormat: { filtersByParty: filters } } },
 });
@@ -29,10 +29,16 @@ test("a question that named a template or an interface is not a question for eve
   // A request naming nobody asks for nothing — it is not "everything".
   assert.equal(contractsAskedEverything(contractsBody({})), false);
   // The super reader's shape names no party and is still a question for everything.
-  assert.equal(contractsAskedEverything({ filter: { filtersForAnyParty: WILDCARD } }), true);
+  assert.equal(contractsAskedEverything({ eventFormat: { filtersForAnyParty: WILDCARD } }), true);
   // The bare list is the shape the node refuses with a 400, so it is not a question that was ever asked.
   assert.equal(
-    contractsAskedEverything({ filter: { filtersForAnyParty: WILDCARD.cumulative } }),
+    contractsAskedEverything({ eventFormat: { filtersForAnyParty: WILDCARD.cumulative } }),
+    false,
+  );
+  // The 2026-09-18 answer key is in the Canton 3.4 spelling, with the filter at the top of the body.
+  assert.equal(contractsAskedEverything({ filter: { filtersByParty: { alice: WILDCARD } } }), true);
+  assert.equal(
+    contractsAskedEverything({ filter: { filtersByParty: { alice: INTERFACE } } }),
     false,
   );
   assert.equal(updatesAskedEverything(updatesBody({ alice: WILDCARD })), true);
@@ -105,7 +111,7 @@ test("an answer key that cannot be one is refused before anything is compared ag
           entry({
             askedAsAnyParty: true,
             asked: {
-              contracts: { filter: { filtersForAnyParty: WILDCARD } },
+              contracts: { eventFormat: { filtersForAnyParty: WILDCARD } },
               updates: {
                 updateFormat: {
                   includeTransactions: { eventFormat: { filtersForAnyParty: WILDCARD } },

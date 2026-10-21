@@ -34,7 +34,8 @@ export function buildGetUpdatesRequest(
     body: {
       beginExclusive,
       endInclusive,
-      verbose: false,
+      // `verbose` belongs inside the event format below. A top-level `verbose` is the Canton 3.4 spelling,
+      // refused from 3.6 — it slipped past only because `false` is indistinguishable from unset on the wire.
       updateFormat: {
         includeTransactions: {
           eventFormat: { ...eventFormatFilters(filter, wildcard), verbose: false },

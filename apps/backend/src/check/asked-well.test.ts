@@ -46,11 +46,11 @@ const acs = (parties: readonly string[], at: number, anyParty = false): NodeCall
   method: "POST",
   path: "/v2/state/active-contracts?limit=200",
   body: {
-    filter: {
+    eventFormat: {
       filtersByParty: Object.fromEntries(parties.map((p) => [p, { cumulative: WILDCARD }])),
       ...(anyParty ? { filtersForAnyParty: { cumulative: WILDCARD } } : {}),
+      verbose: true,
     },
-    verbose: true,
     activeAtOffset: at,
   },
   status: 200,
@@ -77,6 +77,29 @@ test("asking about fewer parties than I hold is the defect this exists for", () 
   const problems = questionProblems("/api/contracts", trace, holder);
   assert.equal(problems.length, 1);
   assert.match(problems[0] ?? "", /asked about 1 of this person's 2 parties/);
+});
+
+test("the 3.4 spelling — filter and verbose at the top of the body — is a finding", () => {
+  // Canton 3.6 refuses it, and the tape keys it as the same question, so only the question itself can say.
+  const slidBack: NodeCall = {
+    method: "POST",
+    path: "/v2/state/active-contracts?limit=200",
+    body: {
+      filter: {
+        filtersByParty: {
+          "alice::1220": { cumulative: WILDCARD },
+          "acme::1220": { cumulative: WILDCARD },
+        },
+      },
+      verbose: true,
+      activeAtOffset: 161,
+    },
+    status: 200,
+    answer: [],
+  };
+  const problems = questionProblems("/api/contracts", [end(161), slidBack], holder);
+  assert.equal(problems.length, 1);
+  assert.match(problems[0] ?? "", /spelling Canton 3.6 refuses/);
 });
 
 test("the order the parties are named in is not a claim", () => {
