@@ -7,9 +7,16 @@ import {
 import { eventFormatFilters } from "./party-filter.ts";
 import type { LedgerCallResult, LedgerPartyFilter, LedgerRequest, LedgerSend } from "./types.ts";
 
-// The party scope is given only via filter.filtersByParty, or — for a viewer reading as every party on the
-// participant — via filter.filtersForAnyParty. Which of the two is decided by LedgerPartyFilter and nowhere
-// else; see party-filter.ts. No other global filter keys are placed in the body.
+// The party scope is given only via eventFormat.filtersByParty, or — for a viewer reading as every party on
+// the participant — via eventFormat.filtersForAnyParty. Which of the two is decided by LedgerPartyFilter and
+// nowhere else; see party-filter.ts. No other global filter keys are placed in the body.
+//
+// **The filter and `verbose` sit under `eventFormat`, not at the top of the body.** Canton 3.3 moved them
+// there; 3.4 and 3.5 still took the old place, 3.6 refuses it (`DEPRECATED_API_DISABLED`, off by default)
+// and 3.7 removes it. The product sent the old place until 2026-10-21, when a participant upgraded to 3.6.3
+// turned every active-contracts read into a 502. The node's own document says the old spelling is converted
+// into this one, and on 3.4.8 the two were answered byte for byte the same — so this spelling is right for
+// every version the product has met.
 //
 // **The snapshot is asked for in parts.** `limit` caps one response at LEDGER_PAGE_SIZE elements, and
 // `streamContinuationToken` says where the next part starts. Without it the node answers
@@ -39,8 +46,7 @@ export function buildGetActiveContractsRequest(
     method: "POST",
     path: withPageLimit("/v2/state/active-contracts", LEDGER_PAGE_SIZE),
     body: {
-      filter: eventFormatFilters(filter, cumulativeEntry),
-      verbose: true,
+      eventFormat: { ...eventFormatFilters(filter, cumulativeEntry), verbose: true },
       activeAtOffset: offset,
       ...(streamContinuationToken === undefined ? {} : { streamContinuationToken }),
     },

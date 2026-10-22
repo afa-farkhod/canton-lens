@@ -25,6 +25,14 @@ prove — that different people see different things.
 **No token is in these files.** Only a person's name goes into the key, and a test scans every file here for
 credential-shaped content.
 
+**The questions are in the Canton 3.4 spelling.** When this was recorded the product put the active-contracts
+filter and `verbose` at the top of the body, and a `verbose: false` at the top of the updates body; since
+2026-10-21 it puts them under `eventFormat`, the place Canton 3.6 insists on (the old place is refused with
+`DEPRECATED_API_DISABLED` and removed in 3.7). Nothing here was rewritten: the key treats the two spellings
+as one question (`asSpelledToday` in `../ledger-tape.ts`), on the node's own word that it converts one into
+the other, measured byte-identical on Canton 3.4.8. The next recording is made in the new spelling, and that
+exception goes with it.
+
 **What each person was given was asked of the node, not read off our own answers.** The party classification
 in `meta.json` is the participant's own rights answer, read the way the product reads it, and a test in the
 repository derives it again from the recorded answer and requires the two to agree. Whether the seed left a

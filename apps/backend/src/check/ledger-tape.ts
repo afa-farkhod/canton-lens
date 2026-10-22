@@ -4,7 +4,8 @@
 // The key is **the question itself** (who · method · path · request body). In the old fixtures the file name
 // was the key (`active-contracts.sample.json`), so "what was asked, and how" was written down nowhere. The
 // result was that two paths and a body shape were wrong while every test passed. With the question as the key,
-// our code asking something different **finds nothing and fails loudly.**
+// our code asking something different **finds nothing and fails loudly.** One spelling difference is excused,
+// and it is written down below (`asSpelledToday`).
 import type { LedgerSend } from "@canton-lens/core";
 
 // One ledger request and its answer. One `.jsonl` line is one of these — split per line, a diff shows *which
@@ -37,7 +38,42 @@ export type TapeEntry = {
 // (router.ts loadSchema), and now that it is fixed every person really does ask the ledger — the reason to
 // exclude them is gone.
 export function tapeKey(who: string, method: string, path: string, body: unknown): string {
-  return `${who} ${method} ${path} ${stableStringify(body)}`;
+  return `${who} ${method} ${path} ${stableStringify(asSpelledToday(path, body))}`;
+}
+
+// ── One question in two spellings ───────────────────────────────────────────────
+// Canton 3.3 moved the active-contracts filter and `verbose` from the top of the body under `eventFormat`,
+// and the top-level `verbose` of an updates request with them. 3.4 and 3.5 still took the old place; 3.6
+// refuses it (`DEPRECATED_API_DISABLED`), 3.7 removes it. The node's own document says the old spelling is
+// converted into the new one, and on 3.4.8 the two were answered byte for byte the same (2026-10-21).
+//
+// The tape was recorded on 3.5.15 in the old spelling, and the product asks in the new one since the fix. So
+// the key is taken in today's spelling whichever way a question was written — the recorded question and the
+// one the code asks are **one question**, not a changed one. The entries are not rewritten: what is in the
+// file is still what was asked.
+//
+// **This is the one difference the key excuses, and it has an end.** A recording made by current code is in
+// the new spelling already, so the day the tape is re-recorded this function can go. Until then a request
+// that slid back to the old spelling is not caught here — asked-well.ts judges the question itself.
+function asSpelledToday(path: string, body: unknown): unknown {
+  if (body === null || typeof body !== "object" || Array.isArray(body)) return body;
+  const record = body as Record<string, unknown>;
+  if (path.startsWith("/v2/state/active-contracts")) {
+    const { filter, verbose, eventFormat, ...rest } = record;
+    if (eventFormat !== undefined || (filter === undefined && verbose === undefined)) return body;
+    const format: Record<string, unknown> = { ...(filter as Record<string, unknown> | undefined) };
+    if (verbose !== undefined) format.verbose = verbose;
+    return { ...rest, eventFormat: format };
+  }
+  if (
+    path.startsWith("/v2/updates") &&
+    record.verbose === false &&
+    record.updateFormat !== undefined
+  ) {
+    const { verbose: _dropped, ...rest } = record;
+    return rest;
+  }
+  return body;
 }
 
 // **It mirrors exactly what goes on the wire.** The body is serialized with `JSON.stringify` before it leaves
